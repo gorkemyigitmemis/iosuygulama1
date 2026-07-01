@@ -17,7 +17,8 @@ const setupWorld = (skin) => {
     resetCollisionEvent();
     let engine = Matter.Engine.create({ enableSleeping: false });
     let world = engine.world;
-    world.gravity.y = 0.5;
+    // Spaceship has heavier gravity
+    world.gravity.y = skin === 'spaceship' ? 0.8 : 0.5;
 
     const pipeSizePos = getPipeSizePosPair();
     const pipeSizePos2 = getPipeSizePosPair(Constants.MAX_WIDTH * 0.55);
@@ -67,6 +68,8 @@ export default function Index() {
     
     const [shopVisible, setShopVisible] = useState(false);
     const [missionsVisible, setMissionsVisible] = useState(false);
+    const [slotVisible, setSlotVisible] = useState(false);
+    const [slotResultText, setSlotResultText] = useState('Şansını Dene!');
     
     const [isNight, setIsNight] = useState(false);
     const [shieldActive, setShieldActive] = useState(false);
@@ -86,9 +89,14 @@ export default function Index() {
     const lastTimeRef = useRef();
     const runningRef = useRef(running);
     const pausedRef = useRef(paused);
+    
+    const skinRef = useRef(skin);
+    const isNightRef = useRef(isNight);
 
     useEffect(() => { runningRef.current = running; }, [running]);
     useEffect(() => { pausedRef.current = paused; }, [paused]);
+    useEffect(() => { skinRef.current = skin; }, [skin]);
+    useEffect(() => { isNightRef.current = isNight; }, [isNight]);
 
     useEffect(() => {
         loadData();
@@ -107,10 +115,10 @@ export default function Index() {
             if (gravityInverted) {
                 entitiesRef.current.physics.world.gravity.y = -0.6;
             } else {
-                entitiesRef.current.physics.world.gravity.y = 0.5;
+                entitiesRef.current.physics.world.gravity.y = skin === 'spaceship' ? 0.8 : 0.5;
             }
         }
-    }, [shieldActive, gravityInverted, magnetActive]);
+    }, [shieldActive, gravityInverted, magnetActive, skin]);
 
     const loadSounds = async () => {
         try {
@@ -202,6 +210,10 @@ export default function Index() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             setTimeout(() => playSound(soundDie), 300);
             updateMission('play');
+        } else if (e.type === 'break_shield') {
+            setShieldActive(false);
+            playSound(soundHit);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         } else if (e.type === 'new_point') {
             setScore(s => {
                 const newScore = s + 1;
@@ -213,7 +225,9 @@ export default function Index() {
             playSound(soundPoint);
         } else if (e.type === 'add_coin') {
             setCoins(c => {
-                const newC = c + 1;
+                // Bat logic: 2x coins at night
+                const amount = (skinRef.current === 'bat' && isNightRef.current) ? 2 : 1;
+                const newC = c + amount;
                 AsyncStorage.setItem('@coins', newC.toString());
                 return newC;
             });
@@ -225,7 +239,7 @@ export default function Index() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             if (e.powerUpType === 'shield') {
                 setShieldActive(true);
-                setTimeout(() => setShieldActive(false), 5000);
+                // No timeout! Shield breaks on impact now.
             } else if (e.powerUpType === 'gravity') {
                 setGravityInverted(true);
                 setTimeout(() => setGravityInverted(false), 5000);
@@ -278,7 +292,8 @@ export default function Index() {
     const restartGame = () => {
         setScore(0);
         setIsNight(false);
-        setShieldActive(false);
+        // Spaceship spawns with shield!
+        setShieldActive(skin === 'spaceship');
         setGravityInverted(false);
         setMagnetActive(false);
         setEntities(setupWorld(skin));
@@ -305,6 +320,42 @@ export default function Index() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
 
+    const playSlot = () => {
+        if (coins < 5) {
+            setSlotResultText("Yetersiz Altın! 🪙");
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            return;
+        }
+        
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        
+        setCoins(c => {
+            const afterBet = c - 5;
+            AsyncStorage.setItem('@coins', afterBet.toString());
+            return afterBet;
+        });
+        
+        setSlotResultText("Dönüyor... 🎰");
+        
+        setTimeout(() => {
+            const isWin = Math.random() > 0.5;
+            if (isWin) {
+                setCoins(c => {
+                    const winAmount = c + 10;
+                    AsyncStorage.setItem('@coins', winAmount.toString());
+                    return winAmount;
+                });
+                setSlotResultText("KAZANDIN! +10 🪙");
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                playSound(soundPoint);
+            } else {
+                setSlotResultText("KAYBETTİN! 📉");
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                playSound(soundHit);
+            }
+        }, 800);
+    };
+
     return (
         <View style={styles.container}>
             <ImageBackground source={require('../../assets/images/background.png')} style={styles.container} resizeMode="cover">
@@ -328,6 +379,7 @@ export default function Index() {
 
                 <View style={styles.coinHUD} pointerEvents="none">
                     <Text style={styles.coinText}>🪙 {coins}</Text>
+                    {skin === 'bat' && isNight && <Text style={{color: '#2ecc71', fontWeight: 'bold', fontSize: 16, textAlign: 'right'}}>2x AKTİF</Text>}
                 </View>
 
                 {running && !paused && (
@@ -351,7 +403,7 @@ export default function Index() {
                     </View>
                 )}
 
-                {!running && !shopVisible && !missionsVisible && !paused && (
+                {!running && !shopVisible && !missionsVisible && !slotVisible && !paused && (
                     <View style={styles.fullScreen}>
                         <View style={styles.gameOverPanel}>
                             <Text style={styles.gameOverTitle}>Flappy Bird</Text>
@@ -372,11 +424,14 @@ export default function Index() {
                             </TouchableOpacity>
 
                             <View style={styles.actionRow}>
-                                <TouchableOpacity style={[styles.button, styles.halfButton, {backgroundColor: '#e6b800'}]} onPress={() => setShopVisible(true)}>
-                                    <Text style={styles.buttonTextSmall}>🛒 MARKET</Text>
+                                <TouchableOpacity style={[styles.button, styles.thirdButton, {backgroundColor: '#e6b800'}]} onPress={() => setShopVisible(true)}>
+                                    <Text style={styles.buttonTextMicro}>🛒 MARKET</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={[styles.button, styles.halfButton, {backgroundColor: '#3498db'}]} onPress={() => setMissionsVisible(true)}>
-                                    <Text style={styles.buttonTextSmall}>🏆 GÖREV</Text>
+                                <TouchableOpacity style={[styles.button, styles.thirdButton, {backgroundColor: '#3498db'}]} onPress={() => setMissionsVisible(true)}>
+                                    <Text style={styles.buttonTextMicro}>🏆 GÖREV</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.button, styles.thirdButton, {backgroundColor: '#9b59b6'}]} onPress={() => {setSlotVisible(true); setSlotResultText("Şansını Dene!");}}>
+                                    <Text style={styles.buttonTextMicro}>🎰 SLOT</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -397,12 +452,18 @@ export default function Index() {
 
                                 <TouchableOpacity style={styles.shopItem} onPress={() => buySkin('spaceship', 10)}>
                                     <Text style={styles.shopEmoji}>🚀</Text>
-                                    <Text style={styles.shopItemText}>Uzay Gemisi (10 🪙) {skin === 'spaceship' ? '(Seçili)' : ''}</Text>
+                                    <View>
+                                        <Text style={styles.shopItemText}>Uzay Gemisi (10 🪙) {skin === 'spaceship' ? '(Seçili)' : ''}</Text>
+                                        <Text style={{color: '#aaa', fontSize: 12}}>Kalkanla başlar, ama ağırdır.</Text>
+                                    </View>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity style={styles.shopItem} onPress={() => buySkin('bat', 25)}>
                                     <Text style={styles.shopEmoji}>🦇</Text>
-                                    <Text style={styles.shopItemText}>Yarasa (25 🪙) {skin === 'bat' ? '(Seçili)' : ''}</Text>
+                                    <View>
+                                        <Text style={styles.shopItemText}>Yarasa (25 🪙) {skin === 'bat' ? '(Seçili)' : ''}</Text>
+                                        <Text style={{color: '#aaa', fontSize: 12}}>Gece modunda 2x altın verir.</Text>
+                                    </View>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity style={[styles.button, {marginTop: 20, backgroundColor: '#d9534f'}]} onPress={() => setShopVisible(false)}>
@@ -448,6 +509,32 @@ export default function Index() {
                         </View>
                     </Modal>
                 )}
+
+                {slotVisible && (
+                    <Modal transparent={true} animationType="fade">
+                        <View style={styles.fullScreen}>
+                            <View style={[styles.shopPanel, { borderColor: '#9b59b6', backgroundColor: '#8e44ad' }]}>
+                                <Text style={[styles.shopTitle, { color: 'white' }]}>🎰 SLOT MAKİNESİ</Text>
+                                <Text style={styles.shopSubtitle}>Mevcut Altın: 🪙 {coins}</Text>
+
+                                <View style={{ backgroundColor: '#2c3e50', padding: 20, borderRadius: 10, borderWidth: 3, borderColor: '#f1c40f', marginVertical: 20, width: '100%', alignItems: 'center' }}>
+                                    <Text style={{ color: 'white', fontSize: 22, fontWeight: 'bold', textAlign: 'center' }}>{slotResultText}</Text>
+                                </View>
+
+                                <TouchableOpacity 
+                                    style={[styles.button, {backgroundColor: '#f1c40f', paddingVertical: 20, width: '100%', alignItems: 'center'}]}
+                                    onPress={playSlot}
+                                >
+                                    <Text style={[styles.buttonText, {color: '#2c3e50'}]}>KOLU ÇEK (5 🪙)</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity style={[styles.button, {marginTop: 20, backgroundColor: '#d9534f'}]} onPress={() => setSlotVisible(false)}>
+                                    <Text style={styles.buttonText}>KAPAT</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </Modal>
+                )}
             </ImageBackground>
         </View>
     );
@@ -468,7 +555,7 @@ const styles = StyleSheet.create({
     magnetHUD: { position: 'absolute', top: 200, right: 20, backgroundColor: 'rgba(255,100,0,0.7)', padding: 10, borderRadius: 10 },
     powerText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
     fullScreen: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
-    gameOverPanel: { backgroundColor: '#ded895', padding: 30, borderRadius: 15, alignItems: 'center', borderWidth: 4, borderColor: '#543847', width: '80%', maxWidth: 400 },
+    gameOverPanel: { backgroundColor: '#ded895', padding: 30, borderRadius: 15, alignItems: 'center', borderWidth: 4, borderColor: '#543847', width: '90%', maxWidth: 400 },
     gameOverTitle: { fontSize: 32, fontWeight: 'bold', color: '#f45b27', marginBottom: 20, textShadowColor: 'white', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
     scoreBoard: { backgroundColor: '#eaddc0', width: '100%', borderRadius: 10, padding: 15, marginBottom: 25, borderWidth: 2, borderColor: '#c6b08a' },
     scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 5 },
@@ -476,9 +563,9 @@ const styles = StyleSheet.create({
     scoreValue: { fontSize: 24, fontWeight: 'bold', color: 'white', textShadowColor: 'black', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
     button: { backgroundColor: '#73BF2E', paddingHorizontal: 30, paddingVertical: 15, borderRadius: 10, borderWidth: 3, borderColor: 'white', elevation: 5 },
     actionRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 15 },
-    halfButton: { paddingHorizontal: 10, flex: 1, marginHorizontal: 5, alignItems: 'center' },
+    thirdButton: { paddingHorizontal: 5, flex: 1, marginHorizontal: 3, alignItems: 'center' },
     buttonText: { color: 'white', fontSize: 24, fontWeight: '900' },
-    buttonTextSmall: { color: 'white', fontSize: 18, fontWeight: '900' },
+    buttonTextMicro: { color: 'white', fontSize: 14, fontWeight: '900' },
     shopPanel: { backgroundColor: '#2c3e50', padding: 30, borderRadius: 20, alignItems: 'center', width: '85%', borderWidth: 4, borderColor: '#f1c40f' },
     shopTitle: { color: '#f1c40f', fontSize: 28, fontWeight: 'bold', marginBottom: 10 },
     shopSubtitle: { color: 'white', fontSize: 18, marginBottom: 20 },

@@ -37,8 +37,9 @@ export const Physics = (entities, { touches, time, dispatch }) => {
                         if (!entities.Bird.hasShield) {
                             dispatch({ type: 'game_over' });
                         } else {
-                            // Bounce off slightly if shielded
+                            // Bounce off slightly if shielded and break shield
                             Matter.Body.setVelocity(entities.Bird.body, { x: 0, y: entities.Bird.gravityInverted ? 3 : -3 });
+                            dispatch({ type: 'break_shield' });
                         }
                     }
                 }
