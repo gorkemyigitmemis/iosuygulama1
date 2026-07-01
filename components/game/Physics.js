@@ -83,10 +83,25 @@ export const Physics = (entities, { touches, time, dispatch }) => {
 
         // Move Coins
         if (entities[`Coin${i}`]) {
-            Matter.Body.translate(entities[`Coin${i}`].body, { x: speed, y: 0 });
-            if (entities[`Coin${i}`].body.bounds.max.x <= 0) {
+            let coinBody = entities[`Coin${i}`].body;
+            
+            if (entities.Bird.hasMagnet && entities[`Coin${i}`].active) {
+                const dx = entities.Bird.body.position.x - coinBody.position.x;
+                const dy = entities.Bird.body.position.y - coinBody.position.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < 500) { // Manyetizma menzili
+                    Matter.Body.translate(coinBody, { x: dx * 0.08, y: dy * 0.08 });
+                } else {
+                    Matter.Body.translate(coinBody, { x: speed, y: 0 });
+                }
+            } else {
+                Matter.Body.translate(coinBody, { x: speed, y: 0 });
+            }
+
+            if (coinBody.bounds.max.x <= 0) {
                 const gapCenterY = entities[`ObstacleTop${i}`].body.position.y + (Constants.MAX_HEIGHT / 2) + (Constants.GAP_SIZE / 2);
-                Matter.Body.setPosition(entities[`Coin${i}`].body, { 
+                Matter.Body.setPosition(coinBody, { 
                     x: entities[`ObstacleBottom${i}`].body.position.x, 
                     y: gapCenterY
                 });
@@ -103,7 +118,8 @@ export const Physics = (entities, { touches, time, dispatch }) => {
                     y: (Constants.MAX_HEIGHT / 2) + (Math.random() * 200 - 100) 
                 });
                 entities[`PowerUp${i}`].active = true;
-                const newType = Math.random() > 0.5 ? 'shield' : 'gravity';
+                const types = ['shield', 'gravity', 'magnet'];
+                const newType = types[Math.floor(Math.random() * types.length)];
                 entities[`PowerUp${i}`].type = newType;
                 entities[`PowerUp${i}`].body.powerUpType = newType;
             }

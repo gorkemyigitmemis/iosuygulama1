@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, TouchableWit
 import Matter from 'matter-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 
 import Bird from '../../components/game/Bird';
 import Floor from '../../components/game/Floor';
@@ -50,17 +51,29 @@ const setupWorld = (skin) => {
     };
 };
 
+const initialMissions = [
+    { id: 1, type: 'play', title: 'Oyun Oyna', target: 5, progress: 0, reward: 20, completed: false },
+    { id: 2, type: 'coins', title: 'Altın Topla', target: 20, progress: 0, reward: 50, completed: false },
+    { id: 3, type: 'score', title: 'Skor Yap', target: 15, progress: 0, reward: 100, completed: false },
+];
+
 export default function Index() {
     const [running, setRunning] = useState(false);
+    const [paused, setPaused] = useState(false);
     const [score, setScore] = useState(0);
     const [highScore, setHighScore] = useState(0);
     const [coins, setCoins] = useState(0);
     const [skin, setSkin] = useState('bird');
+    
     const [shopVisible, setShopVisible] = useState(false);
+    const [missionsVisible, setMissionsVisible] = useState(false);
+    
     const [isNight, setIsNight] = useState(false);
     const [shieldActive, setShieldActive] = useState(false);
     const [gravityInverted, setGravityInverted] = useState(false);
+    const [magnetActive, setMagnetActive] = useState(false);
 
+    const [missions, setMissions] = useState(initialMissions);
     const [entities, setEntities] = useState(() => setupWorld(skin));
     
     const soundWing = useRef(new Audio.Sound());
@@ -72,27 +85,24 @@ export default function Index() {
     const requestRef = useRef();
     const lastTimeRef = useRef();
     const runningRef = useRef(running);
+    const pausedRef = useRef(paused);
 
-    useEffect(() => {
-        runningRef.current = running;
-    }, [running]);
+    useEffect(() => { runningRef.current = running; }, [running]);
+    useEffect(() => { pausedRef.current = paused; }, [paused]);
 
     useEffect(() => {
         loadData();
         loadSounds();
-        return () => {
-            unloadSounds();
-        };
+        return () => unloadSounds();
     }, []);
 
-    useEffect(() => {
-        entitiesRef.current = entities;
-    }, [entities]);
+    useEffect(() => { entitiesRef.current = entities; }, [entities]);
 
     useEffect(() => {
         if (entitiesRef.current && entitiesRef.current.Bird) {
             entitiesRef.current.Bird.hasShield = shieldActive;
             entitiesRef.current.Bird.gravityInverted = gravityInverted;
+            entitiesRef.current.Bird.hasMagnet = magnetActive;
             
             if (gravityInverted) {
                 entitiesRef.current.physics.world.gravity.y = -0.6;
@@ -100,7 +110,7 @@ export default function Index() {
                 entitiesRef.current.physics.world.gravity.y = 0.5;
             }
         }
-    }, [shieldActive, gravityInverted]);
+    }, [shieldActive, gravityInverted, magnetActive]);
 
     const loadSounds = async () => {
         try {
@@ -108,9 +118,7 @@ export default function Index() {
             await soundPoint.current.loadAsync(require('../../assets/audio/point.wav'));
             await soundHit.current.loadAsync(require('../../assets/audio/hit.wav'));
             await soundDie.current.loadAsync(require('../../assets/audio/die.wav'));
-        } catch (e) {
-            console.log(e);
-        }
+        } catch (e) { console.log(e); }
     };
 
     const unloadSounds = async () => {
@@ -130,9 +138,10 @@ export default function Index() {
 
             const savedSkin = await AsyncStorage.getItem('@skin');
             if (savedSkin !== null) setSkin(savedSkin);
-        } catch (e) {
-            console.log(e);
-        }
+
+            const savedMissions = await AsyncStorage.getItem('@missions');
+            if (savedMissions !== null) setMissions(JSON.parse(savedMissions));
+        } catch (e) { console.log(e); }
     };
 
     const saveHighScore = async (newScore) => {
@@ -146,18 +155,59 @@ export default function Index() {
         try { await soundRef.current.replayAsync(); } catch (e) {}
     };
 
+    const updateMission = (type, amount = 1) => {
+        setMissions(prev => {
+            const next = prev.map(m => {
+                if (m.type === type && !m.completed) {
+                    const newProgress = type === 'score' ? Math.max(m.progress, amount) : m.progress + amount;
+                    if (newProgress >= m.target) {
+                        return { ...m, progress: m.target, completed: true };
+                    }
+                    return { ...m, progress: newProgress };
+                }
+                return m;
+            });
+            AsyncStorage.setItem('@missions', JSON.stringify(next));
+            return next;
+        });
+    };
+
+    const claimReward = (id, reward) => {
+        setCoins(c => {
+            const newC = c + reward;
+            AsyncStorage.setItem('@coins', newC.toString());
+            return newC;
+        });
+        setMissions(prev => {
+            const next = prev.map(m => {
+                if (m.id === id) {
+                    return { ...m, target: Math.floor(m.target * 1.5), reward: Math.floor(m.reward * 1.5), progress: 0, completed: false };
+                }
+                return m;
+            });
+            AsyncStorage.setItem('@missions', JSON.stringify(next));
+            return next;
+        });
+        playSound(soundPoint);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    };
+
     const dispatch = (e) => {
         if (e.type === 'game_over') {
             setRunning(false);
             setShieldActive(false);
             setGravityInverted(false);
+            setMagnetActive(false);
             playSound(soundHit);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             setTimeout(() => playSound(soundDie), 300);
+            updateMission('play');
         } else if (e.type === 'new_point') {
             setScore(s => {
                 const newScore = s + 1;
                 if (Math.floor(newScore / 10) % 2 !== 0) setIsNight(true);
                 else setIsNight(false);
+                updateMission('score', newScore);
                 return newScore;
             });
             playSound(soundPoint);
@@ -168,37 +218,36 @@ export default function Index() {
                 return newC;
             });
             playSound(soundPoint);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            updateMission('coins');
         } else if (e.type === 'activate_powerup') {
             playSound(soundPoint);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             if (e.powerUpType === 'shield') {
                 setShieldActive(true);
                 setTimeout(() => setShieldActive(false), 5000);
             } else if (e.powerUpType === 'gravity') {
                 setGravityInverted(true);
                 setTimeout(() => setGravityInverted(false), 5000);
+            } else if (e.powerUpType === 'magnet') {
+                setMagnetActive(true);
+                setTimeout(() => setMagnetActive(false), 5000);
             }
         }
     };
 
     useEffect(() => {
-        if (!running && score > 0) {
-            saveHighScore(score);
-        }
+        if (!running && score > 0) saveHighScore(score);
     }, [running]);
 
     const loop = time => {
         if (!runningRef.current) return;
         
-        if (lastTimeRef.current != undefined) {
+        if (lastTimeRef.current != undefined && !pausedRef.current) {
             const delta = time - lastTimeRef.current;
             let currentEntities = entitiesRef.current;
             
-            currentEntities = Physics(currentEntities, { 
-                touches: [], 
-                time: { delta }, 
-                dispatch 
-            });
-            
+            currentEntities = Physics(currentEntities, { touches: [], time: { delta }, dispatch });
             setEntities({ ...currentEntities });
         }
         
@@ -217,8 +266,9 @@ export default function Index() {
     }, [running]);
 
     const handleTouch = () => {
-        if (!running) return;
+        if (!running || paused) return;
         playSound(soundWing);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         if (entitiesRef.current && entitiesRef.current.Bird) {
             const jumpVelocity = gravityInverted ? 7 : -7;
             Matter.Body.setVelocity(entitiesRef.current.Bird.body, { x: 0, y: jumpVelocity });
@@ -230,6 +280,7 @@ export default function Index() {
         setIsNight(false);
         setShieldActive(false);
         setGravityInverted(false);
+        setMagnetActive(false);
         setEntities(setupWorld(skin));
         setRunning(true);
     };
@@ -241,6 +292,9 @@ export default function Index() {
             setSkin(newSkin);
             AsyncStorage.setItem('@skin', newSkin);
             setEntities(setupWorld(newSkin));
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
     };
 
@@ -248,16 +302,12 @@ export default function Index() {
         setSkin(newSkin);
         AsyncStorage.setItem('@skin', newSkin);
         setEntities(setupWorld(newSkin));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
 
     return (
         <View style={styles.container}>
-            <ImageBackground 
-                source={require('../../assets/images/background.png')} 
-                style={styles.container}
-                resizeMode="cover"
-            >
-                {/* Gece modu filtresi */}
+            <ImageBackground source={require('../../assets/images/background.png')} style={styles.container} resizeMode="cover">
                 {isNight && <View style={styles.nightFilter} />}
 
                 <TouchableWithoutFeedback onPress={handleTouch}>
@@ -265,11 +315,7 @@ export default function Index() {
                         {Object.keys(entities).map(key => {
                             const entity = entities[key];
                             if (entity && entity.renderer) {
-                                return React.cloneElement(entity.renderer, { 
-                                    key: key, 
-                                    body: entity.body, 
-                                    ...entity 
-                                });
+                                return React.cloneElement(entity.renderer, { key, body: entity.body, ...entity });
                             }
                             return null;
                         })}
@@ -284,10 +330,28 @@ export default function Index() {
                     <Text style={styles.coinText}>🪙 {coins}</Text>
                 </View>
 
-                {shieldActive && <View style={styles.shieldHUD}><Text style={styles.powerText}>🛡️ Kalkan Aktif!</Text></View>}
-                {gravityInverted && <View style={styles.gravityHUD}><Text style={styles.powerText}>🔄 Yerçekimi Ters!</Text></View>}
+                {running && !paused && (
+                    <TouchableOpacity style={styles.pauseButton} onPress={() => setPaused(true)}>
+                        <Text style={styles.pauseText}>⏸️</Text>
+                    </TouchableOpacity>
+                )}
 
-                {!running && !shopVisible && (
+                {shieldActive && <View style={styles.shieldHUD}><Text style={styles.powerText}>🛡️ Kalkan!</Text></View>}
+                {gravityInverted && <View style={styles.gravityHUD}><Text style={styles.powerText}>🔄 Ters Yerçekimi!</Text></View>}
+                {magnetActive && <View style={styles.magnetHUD}><Text style={styles.powerText}>🧲 Mıknatıs!</Text></View>}
+
+                {paused && (
+                    <View style={styles.fullScreen}>
+                        <View style={styles.gameOverPanel}>
+                            <Text style={styles.gameOverTitle}>MOLA</Text>
+                            <TouchableOpacity style={styles.button} onPress={() => setPaused(false)}>
+                                <Text style={styles.buttonText}>▶️ DEVAM ET</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
+                {!running && !shopVisible && !missionsVisible && !paused && (
                     <View style={styles.fullScreen}>
                         <View style={styles.gameOverPanel}>
                             <Text style={styles.gameOverTitle}>Flappy Bird</Text>
@@ -307,9 +371,14 @@ export default function Index() {
                                 <Text style={styles.buttonText}>OYUNA BAŞLA</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={[styles.button, {backgroundColor: '#e6b800', marginTop: 15}]} onPress={() => setShopVisible(true)}>
-                                <Text style={styles.buttonText}>🛒 MARKET</Text>
-                            </TouchableOpacity>
+                            <View style={styles.actionRow}>
+                                <TouchableOpacity style={[styles.button, styles.halfButton, {backgroundColor: '#e6b800'}]} onPress={() => setShopVisible(true)}>
+                                    <Text style={styles.buttonTextSmall}>🛒 MARKET</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.button, styles.halfButton, {backgroundColor: '#3498db'}]} onPress={() => setMissionsVisible(true)}>
+                                    <Text style={styles.buttonTextSmall}>🏆 GÖREV</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                 )}
@@ -343,6 +412,42 @@ export default function Index() {
                         </View>
                     </Modal>
                 )}
+
+                {missionsVisible && (
+                    <Modal transparent={true} animationType="slide">
+                        <View style={styles.fullScreen}>
+                            <View style={[styles.shopPanel, { borderColor: '#3498db' }]}>
+                                <Text style={[styles.shopTitle, { color: '#3498db' }]}>GÖREVLER</Text>
+                                <Text style={styles.shopSubtitle}>Tamamla ve ödülü kap!</Text>
+                                
+                                {missions.map(m => (
+                                    <View key={m.id} style={styles.shopItem}>
+                                        <View style={{flex: 1}}>
+                                            <Text style={styles.shopItemText}>{m.title}</Text>
+                                            <Text style={{color: '#ccc', marginTop: 5}}>İlerleme: {m.progress} / {m.target}</Text>
+                                        </View>
+                                        {m.completed ? (
+                                            <TouchableOpacity 
+                                                style={[styles.button, {paddingHorizontal: 15, paddingVertical: 10, backgroundColor: '#2ecc71'}]}
+                                                onPress={() => claimReward(m.id, m.reward)}
+                                            >
+                                                <Text style={{color: 'white', fontWeight: 'bold'}}>AL</Text>
+                                            </TouchableOpacity>
+                                        ) : (
+                                            <View style={{ alignItems: 'center' }}>
+                                                <Text style={{color: '#f1c40f', fontWeight: 'bold', fontSize: 18}}>🪙 {m.reward}</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                ))}
+
+                                <TouchableOpacity style={[styles.button, {marginTop: 20, backgroundColor: '#d9534f'}]} onPress={() => setMissionsVisible(false)}>
+                                    <Text style={styles.buttonText}>KAPAT</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </Modal>
+                )}
             </ImageBackground>
         </View>
     );
@@ -356,8 +461,11 @@ const styles = StyleSheet.create({
     scoreText: { fontSize: 70, fontWeight: '900', color: 'white', textShadowColor: 'black', textShadowOffset: { width: 3, height: 3 }, textShadowRadius: 3, fontFamily: 'monospace' },
     coinHUD: { position: 'absolute', top: 40, right: 20 },
     coinText: { fontSize: 24, fontWeight: 'bold', color: '#ffcc00', textShadowColor: '#000', textShadowOffset: {width:1, height:1}, textShadowRadius: 2 },
+    pauseButton: { position: 'absolute', top: 40, left: 20, backgroundColor: 'rgba(255,255,255,0.4)', padding: 10, borderRadius: 10 },
+    pauseText: { fontSize: 24 },
     shieldHUD: { position: 'absolute', top: 100, right: 20, backgroundColor: 'rgba(0,150,255,0.7)', padding: 10, borderRadius: 10 },
     gravityHUD: { position: 'absolute', top: 150, right: 20, backgroundColor: 'rgba(200,0,200,0.7)', padding: 10, borderRadius: 10 },
+    magnetHUD: { position: 'absolute', top: 200, right: 20, backgroundColor: 'rgba(255,100,0,0.7)', padding: 10, borderRadius: 10 },
     powerText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
     fullScreen: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
     gameOverPanel: { backgroundColor: '#ded895', padding: 30, borderRadius: 15, alignItems: 'center', borderWidth: 4, borderColor: '#543847', width: '80%', maxWidth: 400 },
@@ -367,7 +475,10 @@ const styles = StyleSheet.create({
     scoreLabel: { fontSize: 20, fontWeight: 'bold', color: '#f45b27' },
     scoreValue: { fontSize: 24, fontWeight: 'bold', color: 'white', textShadowColor: 'black', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
     button: { backgroundColor: '#73BF2E', paddingHorizontal: 30, paddingVertical: 15, borderRadius: 10, borderWidth: 3, borderColor: 'white', elevation: 5 },
+    actionRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 15 },
+    halfButton: { paddingHorizontal: 10, flex: 1, marginHorizontal: 5, alignItems: 'center' },
     buttonText: { color: 'white', fontSize: 24, fontWeight: '900' },
+    buttonTextSmall: { color: 'white', fontSize: 18, fontWeight: '900' },
     shopPanel: { backgroundColor: '#2c3e50', padding: 30, borderRadius: 20, alignItems: 'center', width: '85%', borderWidth: 4, borderColor: '#f1c40f' },
     shopTitle: { color: '#f1c40f', fontSize: 28, fontWeight: 'bold', marginBottom: 10 },
     shopSubtitle: { color: 'white', fontSize: 18, marginBottom: 20 },

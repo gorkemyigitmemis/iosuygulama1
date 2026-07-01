@@ -14,12 +14,12 @@ const PowerUpRenderer = (props) => {
         <View style={{
             position: 'absolute', left: xBody, top: yBody, width: widthBody, height: heightBody,
             justifyContent: 'center', alignItems: 'center',
-            backgroundColor: props.type === 'shield' ? 'rgba(0,150,255,0.7)' : 'rgba(200,0,200,0.7)',
+            backgroundColor: props.type === 'shield' ? 'rgba(0,150,255,0.7)' : props.type === 'magnet' ? 'rgba(255,100,0,0.7)' : 'rgba(200,0,200,0.7)',
             borderRadius: 25,
             borderWidth: 2,
             borderColor: 'white'
         }}>
-            <Text style={{fontSize: 25}}>{props.type === 'shield' ? '🛡️' : '🔄'}</Text>
+            <Text style={{fontSize: 25}}>{props.type === 'shield' ? '🛡️' : props.type === 'magnet' ? '🧲' : '🔄'}</Text>
         </View>
     );
 };
