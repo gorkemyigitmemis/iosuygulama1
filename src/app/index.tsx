@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, TouchableWithoutFeedback, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, TouchableWithoutFeedback, Modal, Animated, Easing, Dimensions } from 'react-native';
 import Matter from 'matter-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
@@ -52,6 +52,54 @@ const setupWorld = (skin) => {
     };
 };
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const CoinRain = ({ onComplete }) => {
+    const coins = useRef([...Array(40)].map(() => ({
+        x: Math.random() * SCREEN_WIDTH,
+        animY: new Animated.Value(-50),
+        size: Math.random() * 20 + 20, // 20 to 40
+        delay: Math.random() * 800,
+        duration: Math.random() * 1000 + 1500 // 1.5s to 2.5s
+    }))).current;
+
+    useEffect(() => {
+        const animations = coins.map(coin => 
+            Animated.sequence([
+                Animated.delay(coin.delay),
+                Animated.timing(coin.animY, {
+                    toValue: SCREEN_HEIGHT + 100,
+                    duration: coin.duration,
+                    easing: Easing.linear,
+                    useNativeDriver: true
+                })
+            ])
+        );
+
+        Animated.parallel(animations).start(() => {
+            if (onComplete) onComplete();
+        });
+    }, []);
+
+    return (
+        <View style={[StyleSheet.absoluteFill, { zIndex: 999 }]} pointerEvents="none">
+            {coins.map((coin, index) => (
+                <Animated.Text key={index} style={{
+                    position: 'absolute',
+                    left: coin.x,
+                    fontSize: coin.size,
+                    transform: [{ translateY: coin.animY }],
+                    textShadowColor: 'black',
+                    textShadowOffset: { width: 1, height: 1 },
+                    textShadowRadius: 1
+                }}>
+                    🪙
+                </Animated.Text>
+            ))}
+        </View>
+    );
+};
+
 const initialMissions = [
     { id: 1, type: 'play', title: 'Oyun Oyna', target: 5, progress: 0, reward: 20, completed: false },
     { id: 2, type: 'coins', title: 'Altın Topla', target: 20, progress: 0, reward: 50, completed: false },
@@ -71,6 +119,10 @@ export default function Index() {
     const [slotVisible, setSlotVisible] = useState(false);
     const [slotResultText, setSlotResultText] = useState('Şansını Dene!');
     
+    const [reels, setReels] = useState(['🎰', '🎰', '🎰']);
+    const [isSpinning, setIsSpinning] = useState(false);
+    const [showRain, setShowRain] = useState(false);
+
     const [isNight, setIsNight] = useState(false);
     const [shieldActive, setShieldActive] = useState(false);
     const [gravityInverted, setGravityInverted] = useState(false);
@@ -321,12 +373,16 @@ export default function Index() {
     };
 
     const playSlot = () => {
-        if (coins < 5) {
-            setSlotResultText("Yetersiz Altın! 🪙");
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        if (coins < 5 || isSpinning) {
+            if (coins < 5) {
+                setSlotResultText("Yetersiz Altın! 🪙");
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            }
             return;
         }
         
+        setIsSpinning(true);
+        setShowRain(false);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         
         setCoins(c => {
@@ -337,23 +393,62 @@ export default function Index() {
         
         setSlotResultText("Dönüyor... 🎰");
         
-        setTimeout(() => {
-            const isWin = Math.random() > 0.5;
-            if (isWin) {
-                setCoins(c => {
-                    const winAmount = c + 10;
-                    AsyncStorage.setItem('@coins', winAmount.toString());
-                    return winAmount;
-                });
-                setSlotResultText("KAZANDIN! +10 🪙");
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                playSound(soundPoint);
-            } else {
-                setSlotResultText("KAYBETTİN! 📉");
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                playSound(soundHit);
+        const isWin = Math.random() > 0.5;
+        const symbols = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
+        const winSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+        
+        let loseSymbols = [
+            symbols[Math.floor(Math.random() * symbols.length)],
+            symbols[Math.floor(Math.random() * symbols.length)],
+            symbols[Math.floor(Math.random() * symbols.length)]
+        ];
+        
+        if (!isWin && loseSymbols[0] === loseSymbols[1] && loseSymbols[1] === loseSymbols[2]) {
+            loseSymbols[2] = symbols[(symbols.indexOf(loseSymbols[2]) + 1) % symbols.length];
+        }
+        
+        const finalReels = isWin ? [winSymbol, winSymbol, winSymbol] : loseSymbols;
+        
+        let spins = 0;
+        const interval = setInterval(() => {
+            spins++;
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            
+            setReels(prev => {
+                let r0 = spins > 10 ? finalReels[0] : symbols[Math.floor(Math.random() * symbols.length)];
+                let r1 = spins > 15 ? finalReels[1] : symbols[Math.floor(Math.random() * symbols.length)];
+                let r2 = spins > 20 ? finalReels[2] : symbols[Math.floor(Math.random() * symbols.length)];
+                return [r0, r1, r2];
+            });
+            
+            if (spins > 20) {
+                clearInterval(interval);
+                setIsSpinning(false);
+                
+                if (isWin) {
+                    setCoins(c => {
+                        const winAmount = c + 10;
+                        AsyncStorage.setItem('@coins', winAmount.toString());
+                        return winAmount;
+                    });
+                    setSlotResultText("KAZANDIN! +10 🪙");
+                    setShowRain(true);
+                    
+                    let ringCount = 0;
+                    const ringInterval = setInterval(() => {
+                        playSound(soundPoint);
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        ringCount++;
+                        if (ringCount >= 5) clearInterval(ringInterval);
+                    }, 150);
+                    
+                } else {
+                    setSlotResultText("KAYBETTİN! 📉");
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                    playSound(soundHit);
+                }
             }
-        }, 800);
+        }, 100);
     };
 
     return (
@@ -517,21 +612,29 @@ export default function Index() {
                                 <Text style={[styles.shopTitle, { color: 'white' }]}>🎰 SLOT MAKİNESİ</Text>
                                 <Text style={styles.shopSubtitle}>Mevcut Altın: 🪙 {coins}</Text>
 
-                                <View style={{ backgroundColor: '#2c3e50', padding: 20, borderRadius: 10, borderWidth: 3, borderColor: '#f1c40f', marginVertical: 20, width: '100%', alignItems: 'center' }}>
-                                    <Text style={{ color: 'white', fontSize: 22, fontWeight: 'bold', textAlign: 'center' }}>{slotResultText}</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 20 }}>
+                                    <View style={styles.reelBox}><Text style={styles.reelText}>{reels[0]}</Text></View>
+                                    <View style={styles.reelBox}><Text style={styles.reelText}>{reels[1]}</Text></View>
+                                    <View style={styles.reelBox}><Text style={styles.reelText}>{reels[2]}</Text></View>
+                                </View>
+
+                                <View style={{ backgroundColor: '#2c3e50', padding: 15, borderRadius: 10, borderWidth: 3, borderColor: '#f1c40f', marginBottom: 20, width: '100%', alignItems: 'center' }}>
+                                    <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', textAlign: 'center' }}>{slotResultText}</Text>
                                 </View>
 
                                 <TouchableOpacity 
-                                    style={[styles.button, {backgroundColor: '#f1c40f', paddingVertical: 20, width: '100%', alignItems: 'center'}]}
+                                    style={[styles.button, {backgroundColor: isSpinning ? '#7f8c8d' : '#f1c40f', paddingVertical: 20, width: '100%', alignItems: 'center'}]}
                                     onPress={playSlot}
+                                    disabled={isSpinning}
                                 >
-                                    <Text style={[styles.buttonText, {color: '#2c3e50'}]}>KOLU ÇEK (5 🪙)</Text>
+                                    <Text style={[styles.buttonText, {color: '#2c3e50'}]}>{isSpinning ? 'DÖNÜYOR...' : 'KOLU ÇEK (5 🪙)'}</Text>
                                 </TouchableOpacity>
 
-                                <TouchableOpacity style={[styles.button, {marginTop: 20, backgroundColor: '#d9534f'}]} onPress={() => setSlotVisible(false)}>
+                                <TouchableOpacity style={[styles.button, {marginTop: 20, backgroundColor: '#d9534f'}]} onPress={() => setSlotVisible(false)} disabled={isSpinning}>
                                     <Text style={styles.buttonText}>KAPAT</Text>
                                 </TouchableOpacity>
                             </View>
+                            {showRain && <CoinRain />}
                         </View>
                     </Modal>
                 )}
@@ -571,5 +674,7 @@ const styles = StyleSheet.create({
     shopSubtitle: { color: 'white', fontSize: 18, marginBottom: 20 },
     shopItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#34495e', width: '100%', padding: 15, borderRadius: 10, marginVertical: 5, borderWidth: 2, borderColor: '#2980b9' },
     shopEmoji: { fontSize: 35, marginRight: 15 },
-    shopItemText: { color: 'white', fontSize: 18, fontWeight: 'bold' }
+    shopItemText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+    reelBox: { backgroundColor: 'white', padding: 15, marginHorizontal: 5, borderRadius: 10, borderWidth: 4, borderColor: '#e74c3c', width: 80, height: 80, justifyContent: 'center', alignItems: 'center' },
+    reelText: { fontSize: 45 }
 });
