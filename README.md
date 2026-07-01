@@ -1,56 +1,41 @@
-# Welcome to your Expo app 👋
+# 🐦 Flappy Bird Clone - Benim İlk iOS Uygulamam!
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Herkese merhaba! 👋 
+Benim adım **Görkem Yiğit Memiş**. Mobil uygulama geliştirme dünyasına adım atmaya karar verdim ve bu proje, **hayatımdaki ilk iOS uygulamam!** 
 
-## Get started
+Uygulama geliştirmeyi öğrenirken "İlk ne yapsam?" diye düşündüm ve aklıma o efsanevi, herkesin bir dönem sinir krizleri geçirerek oynadığı klasik oyun geldi: **Flappy Bird**. Klasik bir projeyle başlamanın temel mantığı anlamak için en iyi yol olduğunu düşündüm. Fakat işin içine girdikçe duramadım ve orijinalinden çok daha gelişmiş bir sistem kurdum! 
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## 🚀 Oyundaki Özellikler (Orijinalinden Farklarımız)
 
-2. Start the app
+Bu sadece basit bir klon değil, tam teşekküllü ve zenginleştirilmiş bir mobil oyun oldu:
 
-   ```bash
-   npx expo start
-   ```
+- 🛒 **Kozmetik Market (Shop Sistemi):** Havada uçarken altın (🪙) toplayıp bakiye biriktirebilirsiniz. Bu altınlarla uzay gemisi (🚀) veya yarasa (🦇) karakterleri satın alıp onlarla oynayabilirsiniz!
+- ⚡ **Güçlendiriciler (Power-ups):** Oyun sırasında rastgele beliren güçlendiriciler var:
+  - 🛡️ **Kalkan:** İlk çarptığınız borudan hasar almanızı engeller.
+  - 🔄 **Ters Yerçekimi:** 5 saniyeliğine yerçekimini tersine çevirir (Yukarı düşersiniz, aşağı inmek için tıklamanız gerekir!).
+- 🌙 **Gece / Gündüz Döngüsü:** Skorunuz her 10 puanda bir arttığında oyun akıcı bir şekilde gece moduna geçer ve geri döner.
+- 💾 **Kalıcı Hafıza:** En yüksek skorunuz (High Score), altınlarınız ve satın aldığınız karakterler cihaz hafızasına kaydedilir. Oyunu kapatsanız bile silinmez.
+- 🎵 **Klasik Ses Efektleri:** Zıplama, puan alma ve çarpma sesleri birebir entegre edilmiştir.
+- 📈 **Dinamik Zorluk:** Puanınız arttıkça boruların üzerinize gelme hızı giderek artar!
 
-In the output, you'll find options to open the app in a
+---
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 🛠️ Kullanılan Teknolojiler
+Bu projeyi geliştirirken modern mobil geliştirme araçlarını kullandım:
+- **React Native & Expo:** Çapraz platform (iOS & Android) geliştirme altyapısı.
+- **Matter.js:** Gerçekçi fizik motoru, yerçekimi ve çarpışma hesaplamaları için.
+- **Expo AV:** Gecikmesiz ses motoru ve efekt yönetimi.
+- **AsyncStorage:** Cihaz içi yerel veri tabanı işlemleri (Skor ve altın kaydı).
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
+## 💡 Kurulum ve Çalıştırma
+Projeyi kendi cihazınızda denemek isterseniz:
+1. Depoyu bilgisayarınıza indirin (`git clone`).
+2. Terminal üzerinden klasöre girip `npm install` komutuyla paketleri yükleyin.
+3. `npm start` komutuyla Expo sunucusunu başlatın.
+4. Çıkan QR kodu telefonunuzdaki **Expo Go** uygulamasına veya kameranıza okutarak hemen oynamaya başlayın!
 
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+İlk iOS uygulamamda beni yalnız bırakmadığınız için teşekkürler. Her türlü yoruma ve katkıya açığım! İyi oyunlar! 🎮
