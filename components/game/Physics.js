@@ -85,9 +85,10 @@ export const Physics = (entities, { touches, time, dispatch }) => {
         if (entities[`Coin${i}`]) {
             Matter.Body.translate(entities[`Coin${i}`].body, { x: speed, y: 0 });
             if (entities[`Coin${i}`].body.bounds.max.x <= 0) {
+                const gapCenterY = entities[`ObstacleTop${i}`].body.position.y + (Constants.MAX_HEIGHT / 2) + (Constants.GAP_SIZE / 2);
                 Matter.Body.setPosition(entities[`Coin${i}`].body, { 
                     x: entities[`ObstacleBottom${i}`].body.position.x, 
-                    y: (Constants.MAX_HEIGHT / 2) + (Math.random() * 100 - 50) 
+                    y: gapCenterY
                 });
                 entities[`Coin${i}`].active = true;
             }

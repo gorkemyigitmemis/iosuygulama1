@@ -30,8 +30,8 @@ const setupWorld = (skin) => {
     let obstacleTop2 = Pipe(world, 'ObstacleTop2', pipeSizePos2.pipeTop.pos, pipeSizePos2.pipeTop.size, true);
     let obstacleBottom2 = Pipe(world, 'ObstacleBottom2', pipeSizePos2.pipeBottom.pos, pipeSizePos2.pipeBottom.size, false);
 
-    let coin1 = Coin(world, { x: pipeSizePos.pipeTop.pos.x, y: Constants.MAX_HEIGHT / 2 });
-    let coin2 = Coin(world, { x: pipeSizePos2.pipeTop.pos.x, y: Constants.MAX_HEIGHT / 2 });
+    let coin1 = Coin(world, { x: pipeSizePos.pipeTop.pos.x, y: pipeSizePos.pipeTop.pos.y + (Constants.MAX_HEIGHT / 2) + (Constants.GAP_SIZE / 2) });
+    let coin2 = Coin(world, { x: pipeSizePos2.pipeTop.pos.x, y: pipeSizePos2.pipeTop.pos.y + (Constants.MAX_HEIGHT / 2) + (Constants.GAP_SIZE / 2) });
 
     let powerUp1 = PowerUp(world, { x: pipeSizePos.pipeTop.pos.x + 400, y: Math.random() * Constants.MAX_HEIGHT }, 'shield');
 
@@ -71,6 +71,11 @@ export default function Index() {
     const entitiesRef = useRef(entities);
     const requestRef = useRef();
     const lastTimeRef = useRef();
+    const runningRef = useRef(running);
+
+    useEffect(() => {
+        runningRef.current = running;
+    }, [running]);
 
     useEffect(() => {
         loadData();
@@ -182,7 +187,7 @@ export default function Index() {
     }, [running]);
 
     const loop = time => {
-        if (!running) return;
+        if (!runningRef.current) return;
         
         if (lastTimeRef.current != undefined) {
             const delta = time - lastTimeRef.current;
