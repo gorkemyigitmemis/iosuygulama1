@@ -21,7 +21,7 @@ const CoinRenderer = (props) => {
 };
 
 export default (world, pos) => {
-    const body = Matter.Bodies.rectangle(pos.x, pos.y, 40, 40, { label: 'Coin', isSensor: true });
+    const body = Matter.Bodies.rectangle(pos.x, pos.y, 40, 40, { label: 'Coin', isSensor: true, isStatic: true });
     Matter.World.add(world, body);
     return { body, active: true, renderer: <CoinRenderer /> };
 };

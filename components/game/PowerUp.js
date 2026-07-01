@@ -25,7 +25,7 @@ const PowerUpRenderer = (props) => {
 };
 
 export default (world, pos, type) => {
-    const body = Matter.Bodies.rectangle(pos.x, pos.y, 50, 50, { label: 'PowerUp', isSensor: true, powerUpType: type });
+    const body = Matter.Bodies.rectangle(pos.x, pos.y, 50, 50, { label: 'PowerUp', isSensor: true, isStatic: true, powerUpType: type });
     Matter.World.add(world, body);
     return { body, active: true, type, renderer: <PowerUpRenderer /> };
 };
