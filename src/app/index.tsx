@@ -4,6 +4,8 @@ import Matter from 'matter-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import Bird from '../../components/game/Bird';
 import Floor from '../../components/game/Floor';
@@ -17,7 +19,6 @@ const setupWorld = (skin) => {
     resetCollisionEvent();
     let engine = Matter.Engine.create({ enableSleeping: false });
     let world = engine.world;
-    // Spaceship has heavier gravity
     world.gravity.y = skin === 'spaceship' ? 0.8 : 0.5;
 
     const pipeSizePos = getPipeSizePosPair();
@@ -58,9 +59,9 @@ const CoinRain = ({ onComplete }) => {
     const coins = useRef([...Array(40)].map(() => ({
         x: Math.random() * SCREEN_WIDTH,
         animY: new Animated.Value(-50),
-        size: Math.random() * 20 + 20, // 20 to 40
+        size: Math.random() * 20 + 20, 
         delay: Math.random() * 800,
-        duration: Math.random() * 1000 + 1500 // 1.5s to 2.5s
+        duration: Math.random() * 1000 + 1500 
     }))).current;
 
     useEffect(() => {
@@ -277,7 +278,6 @@ export default function Index() {
             playSound(soundPoint);
         } else if (e.type === 'add_coin') {
             setCoins(c => {
-                // Bat logic: 2x coins at night
                 const amount = (skinRef.current === 'bat' && isNightRef.current) ? 2 : 1;
                 const newC = c + amount;
                 AsyncStorage.setItem('@coins', newC.toString());
@@ -291,7 +291,6 @@ export default function Index() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             if (e.powerUpType === 'shield') {
                 setShieldActive(true);
-                // No timeout! Shield breaks on impact now.
             } else if (e.powerUpType === 'gravity') {
                 setGravityInverted(true);
                 setTimeout(() => setGravityInverted(false), 5000);
@@ -344,7 +343,6 @@ export default function Index() {
     const restartGame = () => {
         setScore(0);
         setIsNight(false);
-        // Spaceship spawns with shield!
         setShieldActive(skin === 'spaceship');
         setGravityInverted(false);
         setMagnetActive(false);
@@ -474,36 +472,60 @@ export default function Index() {
 
                 <View style={styles.coinHUD} pointerEvents="none">
                     <Text style={styles.coinText}>🪙 {coins}</Text>
-                    {skin === 'bat' && isNight && <Text style={{color: '#2ecc71', fontWeight: 'bold', fontSize: 16, textAlign: 'right'}}>2x AKTİF</Text>}
+                    {skin === 'bat' && isNight && <Text style={styles.batMultiplier}>2x AKTİF</Text>}
                 </View>
 
                 {running && !paused && (
                     <TouchableOpacity style={styles.pauseButton} onPress={() => setPaused(true)}>
-                        <Text style={styles.pauseText}>⏸️</Text>
+                        <BlurView intensity={30} tint="light" style={styles.glassBadge}>
+                            <Text style={styles.pauseText}>⏸️</Text>
+                        </BlurView>
                     </TouchableOpacity>
                 )}
 
-                {shieldActive && <View style={styles.shieldHUD}><Text style={styles.powerText}>🛡️ Kalkan!</Text></View>}
-                {gravityInverted && <View style={styles.gravityHUD}><Text style={styles.powerText}>🔄 Ters Yerçekimi!</Text></View>}
-                {magnetActive && <View style={styles.magnetHUD}><Text style={styles.powerText}>🧲 Mıknatıs!</Text></View>}
+                {shieldActive && (
+                    <View style={styles.shieldHUD}>
+                        <BlurView intensity={50} tint="dark" style={styles.glassBadge}>
+                            <Text style={styles.powerText}>🛡️ KALKAN</Text>
+                        </BlurView>
+                    </View>
+                )}
+                
+                {gravityInverted && (
+                    <View style={styles.gravityHUD}>
+                        <BlurView intensity={50} tint="dark" style={styles.glassBadge}>
+                            <Text style={styles.powerText}>🔄 TERS YERÇEKİMİ</Text>
+                        </BlurView>
+                    </View>
+                )}
+                
+                {magnetActive && (
+                    <View style={styles.magnetHUD}>
+                        <BlurView intensity={50} tint="dark" style={styles.glassBadge}>
+                            <Text style={styles.powerText}>🧲 MIKNATIS</Text>
+                        </BlurView>
+                    </View>
+                )}
 
                 {paused && (
                     <View style={styles.fullScreen}>
-                        <View style={styles.gameOverPanel}>
+                        <BlurView intensity={60} tint="dark" style={styles.gameOverPanel}>
                             <Text style={styles.gameOverTitle}>MOLA</Text>
-                            <TouchableOpacity style={styles.button} onPress={() => setPaused(false)}>
-                                <Text style={styles.buttonText}>▶️ DEVAM ET</Text>
+                            <TouchableOpacity onPress={() => setPaused(false)}>
+                                <LinearGradient colors={['#00c6ff', '#0072ff']} style={styles.gradientButton}>
+                                    <Text style={styles.buttonText}>▶️ DEVAM ET</Text>
+                                </LinearGradient>
                             </TouchableOpacity>
-                        </View>
+                        </BlurView>
                     </View>
                 )}
 
                 {!running && !shopVisible && !missionsVisible && !slotVisible && !paused && (
                     <View style={styles.fullScreen}>
-                        <View style={styles.gameOverPanel}>
+                        <BlurView intensity={60} tint="dark" style={styles.gameOverPanel}>
                             <Text style={styles.gameOverTitle}>Flappy Bird</Text>
                             
-                            <View style={styles.scoreBoard}>
+                            <View style={styles.scoreBoardGlass}>
                                 <View style={styles.scoreRow}>
                                     <Text style={styles.scoreLabel}>SKOR</Text>
                                     <Text style={styles.scoreValue}>{score}</Text>
@@ -514,31 +536,39 @@ export default function Index() {
                                 </View>
                             </View>
 
-                            <TouchableOpacity style={styles.button} onPress={restartGame}>
-                                <Text style={styles.buttonText}>OYUNA BAŞLA</Text>
+                            <TouchableOpacity onPress={restartGame}>
+                                <LinearGradient colors={['#f83600', '#f9d423']} style={styles.gradientButton}>
+                                    <Text style={styles.buttonText}>🚀 OYUNA BAŞLA</Text>
+                                </LinearGradient>
                             </TouchableOpacity>
 
                             <View style={styles.actionRow}>
-                                <TouchableOpacity style={[styles.button, styles.thirdButton, {backgroundColor: '#e6b800'}]} onPress={() => setShopVisible(true)}>
-                                    <Text style={styles.buttonTextMicro}>🛒 MARKET</Text>
+                                <TouchableOpacity style={styles.thirdButtonWrapper} onPress={() => setShopVisible(true)}>
+                                    <LinearGradient colors={['#f6d365', '#fda085']} style={styles.gradientButtonSmall}>
+                                        <Text style={styles.buttonTextMicro}>🛒 MARKET</Text>
+                                    </LinearGradient>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={[styles.button, styles.thirdButton, {backgroundColor: '#3498db'}]} onPress={() => setMissionsVisible(true)}>
-                                    <Text style={styles.buttonTextMicro}>🏆 GÖREV</Text>
+                                <TouchableOpacity style={styles.thirdButtonWrapper} onPress={() => setMissionsVisible(true)}>
+                                    <LinearGradient colors={['#4facfe', '#00f2fe']} style={styles.gradientButtonSmall}>
+                                        <Text style={styles.buttonTextMicro}>🏆 GÖREV</Text>
+                                    </LinearGradient>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={[styles.button, styles.thirdButton, {backgroundColor: '#9b59b6'}]} onPress={() => {setSlotVisible(true); setSlotResultText("Şansını Dene!");}}>
-                                    <Text style={styles.buttonTextMicro}>🎰 SLOT</Text>
+                                <TouchableOpacity style={styles.thirdButtonWrapper} onPress={() => {setSlotVisible(true); setSlotResultText("Şansını Dene!");}}>
+                                    <LinearGradient colors={['#b224ef', '#7579ff']} style={styles.gradientButtonSmall}>
+                                        <Text style={styles.buttonTextMicro}>🎰 SLOT</Text>
+                                    </LinearGradient>
                                 </TouchableOpacity>
                             </View>
-                        </View>
+                        </BlurView>
                     </View>
                 )}
 
                 {shopVisible && (
                     <Modal transparent={true} animationType="slide">
                         <View style={styles.fullScreen}>
-                            <View style={styles.shopPanel}>
-                                <Text style={styles.shopTitle}>KOZMETİK MARKET</Text>
-                                <Text style={styles.shopSubtitle}>Altınların: 🪙 {coins}</Text>
+                            <BlurView intensity={70} tint="dark" style={styles.shopPanel}>
+                                <Text style={styles.shopTitle}>MARKET</Text>
+                                <Text style={styles.shopSubtitle}>Mevcut Altın: 🪙 {coins}</Text>
 
                                 <TouchableOpacity style={styles.shopItem} onPress={() => selectSkin('bird')}>
                                     <Text style={styles.shopEmoji}>🐦</Text>
@@ -549,7 +579,7 @@ export default function Index() {
                                     <Text style={styles.shopEmoji}>🚀</Text>
                                     <View>
                                         <Text style={styles.shopItemText}>Uzay Gemisi (10 🪙) {skin === 'spaceship' ? '(Seçili)' : ''}</Text>
-                                        <Text style={{color: '#aaa', fontSize: 12}}>Kalkanla başlar, ama ağırdır.</Text>
+                                        <Text style={styles.shopItemDesc}>Kalkanla başlar, ağırdır.</Text>
                                     </View>
                                 </TouchableOpacity>
 
@@ -557,14 +587,16 @@ export default function Index() {
                                     <Text style={styles.shopEmoji}>🦇</Text>
                                     <View>
                                         <Text style={styles.shopItemText}>Yarasa (25 🪙) {skin === 'bat' ? '(Seçili)' : ''}</Text>
-                                        <Text style={{color: '#aaa', fontSize: 12}}>Gece modunda 2x altın verir.</Text>
+                                        <Text style={styles.shopItemDesc}>Gece modunda 2x altın verir.</Text>
                                     </View>
                                 </TouchableOpacity>
 
-                                <TouchableOpacity style={[styles.button, {marginTop: 20, backgroundColor: '#d9534f'}]} onPress={() => setShopVisible(false)}>
-                                    <Text style={styles.buttonText}>KAPAT</Text>
+                                <TouchableOpacity style={{marginTop: 20, width: '100%'}} onPress={() => setShopVisible(false)}>
+                                    <LinearGradient colors={['#ff0844', '#ffb199']} style={styles.gradientButton}>
+                                        <Text style={styles.buttonText}>KAPAT</Text>
+                                    </LinearGradient>
                                 </TouchableOpacity>
-                            </View>
+                            </BlurView>
                         </View>
                     </Modal>
                 )}
@@ -572,22 +604,21 @@ export default function Index() {
                 {missionsVisible && (
                     <Modal transparent={true} animationType="slide">
                         <View style={styles.fullScreen}>
-                            <View style={[styles.shopPanel, { borderColor: '#3498db' }]}>
-                                <Text style={[styles.shopTitle, { color: '#3498db' }]}>GÖREVLER</Text>
+                            <BlurView intensity={70} tint="dark" style={[styles.shopPanel, { borderColor: '#00f2fe' }]}>
+                                <Text style={[styles.shopTitle, { color: '#00f2fe' }]}>GÖREVLER</Text>
                                 <Text style={styles.shopSubtitle}>Tamamla ve ödülü kap!</Text>
                                 
                                 {missions.map(m => (
                                     <View key={m.id} style={styles.shopItem}>
                                         <View style={{flex: 1}}>
                                             <Text style={styles.shopItemText}>{m.title}</Text>
-                                            <Text style={{color: '#ccc', marginTop: 5}}>İlerleme: {m.progress} / {m.target}</Text>
+                                            <Text style={styles.shopItemDesc}>İlerleme: {m.progress} / {m.target}</Text>
                                         </View>
                                         {m.completed ? (
-                                            <TouchableOpacity 
-                                                style={[styles.button, {paddingHorizontal: 15, paddingVertical: 10, backgroundColor: '#2ecc71'}]}
-                                                onPress={() => claimReward(m.id, m.reward)}
-                                            >
-                                                <Text style={{color: 'white', fontWeight: 'bold'}}>AL</Text>
+                                            <TouchableOpacity onPress={() => claimReward(m.id, m.reward)}>
+                                                <LinearGradient colors={['#11998e', '#38ef7d']} style={styles.claimButton}>
+                                                    <Text style={styles.claimText}>AL</Text>
+                                                </LinearGradient>
                                             </TouchableOpacity>
                                         ) : (
                                             <View style={{ alignItems: 'center' }}>
@@ -597,10 +628,12 @@ export default function Index() {
                                     </View>
                                 ))}
 
-                                <TouchableOpacity style={[styles.button, {marginTop: 20, backgroundColor: '#d9534f'}]} onPress={() => setMissionsVisible(false)}>
-                                    <Text style={styles.buttonText}>KAPAT</Text>
+                                <TouchableOpacity style={{marginTop: 20, width: '100%'}} onPress={() => setMissionsVisible(false)}>
+                                    <LinearGradient colors={['#ff0844', '#ffb199']} style={styles.gradientButton}>
+                                        <Text style={styles.buttonText}>KAPAT</Text>
+                                    </LinearGradient>
                                 </TouchableOpacity>
-                            </View>
+                            </BlurView>
                         </View>
                     </Modal>
                 )}
@@ -608,32 +641,32 @@ export default function Index() {
                 {slotVisible && (
                     <Modal transparent={true} animationType="fade">
                         <View style={styles.fullScreen}>
-                            <View style={[styles.shopPanel, { borderColor: '#9b59b6', backgroundColor: '#8e44ad' }]}>
-                                <Text style={[styles.shopTitle, { color: 'white' }]}>🎰 SLOT MAKİNESİ</Text>
+                            <BlurView intensity={90} tint="dark" style={[styles.shopPanel, { borderColor: '#b224ef' }]}>
+                                <Text style={[styles.shopTitle, { color: '#e0c3fc' }]}>🎰 SLOT MAKİNESİ</Text>
                                 <Text style={styles.shopSubtitle}>Mevcut Altın: 🪙 {coins}</Text>
 
-                                <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 20 }}>
+                                <View style={styles.slotContainer}>
                                     <View style={styles.reelBox}><Text style={styles.reelText}>{reels[0]}</Text></View>
                                     <View style={styles.reelBox}><Text style={styles.reelText}>{reels[1]}</Text></View>
                                     <View style={styles.reelBox}><Text style={styles.reelText}>{reels[2]}</Text></View>
                                 </View>
 
-                                <View style={{ backgroundColor: '#2c3e50', padding: 15, borderRadius: 10, borderWidth: 3, borderColor: '#f1c40f', marginBottom: 20, width: '100%', alignItems: 'center' }}>
-                                    <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', textAlign: 'center' }}>{slotResultText}</Text>
+                                <View style={styles.slotResultBox}>
+                                    <Text style={styles.slotResultText}>{slotResultText}</Text>
                                 </View>
 
-                                <TouchableOpacity 
-                                    style={[styles.button, {backgroundColor: isSpinning ? '#7f8c8d' : '#f1c40f', paddingVertical: 20, width: '100%', alignItems: 'center'}]}
-                                    onPress={playSlot}
-                                    disabled={isSpinning}
-                                >
-                                    <Text style={[styles.buttonText, {color: '#2c3e50'}]}>{isSpinning ? 'DÖNÜYOR...' : 'KOLU ÇEK (5 🪙)'}</Text>
+                                <TouchableOpacity disabled={isSpinning} style={{width: '100%'}} onPress={playSlot}>
+                                    <LinearGradient colors={isSpinning ? ['#8e9eab', '#eef2f3'] : ['#f6d365', '#fda085']} style={styles.gradientButton}>
+                                        <Text style={[styles.buttonText, {color: '#2c3e50'}]}>{isSpinning ? 'DÖNÜYOR...' : 'KOLU ÇEK (5 🪙)'}</Text>
+                                    </LinearGradient>
                                 </TouchableOpacity>
 
-                                <TouchableOpacity style={[styles.button, {marginTop: 20, backgroundColor: '#d9534f'}]} onPress={() => setSlotVisible(false)} disabled={isSpinning}>
-                                    <Text style={styles.buttonText}>KAPAT</Text>
+                                <TouchableOpacity style={{marginTop: 20, width: '100%'}} onPress={() => setSlotVisible(false)} disabled={isSpinning}>
+                                    <LinearGradient colors={['#ff0844', '#ffb199']} style={styles.gradientButton}>
+                                        <Text style={styles.buttonText}>KAPAT</Text>
+                                    </LinearGradient>
                                 </TouchableOpacity>
-                            </View>
+                            </BlurView>
                             {showRain && <CoinRain />}
                         </View>
                     </Modal>
@@ -648,33 +681,42 @@ const styles = StyleSheet.create({
     gameContainer: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
     nightFilter: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 50, 0.6)' },
     scoreContainer: { position: 'absolute', top: 80, width: '100%', alignItems: 'center' },
-    scoreText: { fontSize: 70, fontWeight: '900', color: 'white', textShadowColor: 'black', textShadowOffset: { width: 3, height: 3 }, textShadowRadius: 3, fontFamily: 'monospace' },
+    scoreText: { fontSize: 70, fontWeight: '900', color: 'white', textShadowColor: 'black', textShadowOffset: { width: 3, height: 3 }, textShadowRadius: 10, fontFamily: 'monospace' },
     coinHUD: { position: 'absolute', top: 40, right: 20 },
-    coinText: { fontSize: 24, fontWeight: 'bold', color: '#ffcc00', textShadowColor: '#000', textShadowOffset: {width:1, height:1}, textShadowRadius: 2 },
-    pauseButton: { position: 'absolute', top: 40, left: 20, backgroundColor: 'rgba(255,255,255,0.4)', padding: 10, borderRadius: 10 },
-    pauseText: { fontSize: 24 },
-    shieldHUD: { position: 'absolute', top: 100, right: 20, backgroundColor: 'rgba(0,150,255,0.7)', padding: 10, borderRadius: 10 },
-    gravityHUD: { position: 'absolute', top: 150, right: 20, backgroundColor: 'rgba(200,0,200,0.7)', padding: 10, borderRadius: 10 },
-    magnetHUD: { position: 'absolute', top: 200, right: 20, backgroundColor: 'rgba(255,100,0,0.7)', padding: 10, borderRadius: 10 },
-    powerText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-    fullScreen: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
-    gameOverPanel: { backgroundColor: '#ded895', padding: 30, borderRadius: 15, alignItems: 'center', borderWidth: 4, borderColor: '#543847', width: '90%', maxWidth: 400 },
-    gameOverTitle: { fontSize: 32, fontWeight: 'bold', color: '#f45b27', marginBottom: 20, textShadowColor: 'white', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
-    scoreBoard: { backgroundColor: '#eaddc0', width: '100%', borderRadius: 10, padding: 15, marginBottom: 25, borderWidth: 2, borderColor: '#c6b08a' },
-    scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 5 },
-    scoreLabel: { fontSize: 20, fontWeight: 'bold', color: '#f45b27' },
-    scoreValue: { fontSize: 24, fontWeight: 'bold', color: 'white', textShadowColor: 'black', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 },
-    button: { backgroundColor: '#73BF2E', paddingHorizontal: 30, paddingVertical: 15, borderRadius: 10, borderWidth: 3, borderColor: 'white', elevation: 5 },
-    actionRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 15 },
-    thirdButton: { paddingHorizontal: 5, flex: 1, marginHorizontal: 3, alignItems: 'center' },
-    buttonText: { color: 'white', fontSize: 24, fontWeight: '900' },
-    buttonTextMicro: { color: 'white', fontSize: 14, fontWeight: '900' },
-    shopPanel: { backgroundColor: '#2c3e50', padding: 30, borderRadius: 20, alignItems: 'center', width: '85%', borderWidth: 4, borderColor: '#f1c40f' },
-    shopTitle: { color: '#f1c40f', fontSize: 28, fontWeight: 'bold', marginBottom: 10 },
-    shopSubtitle: { color: 'white', fontSize: 18, marginBottom: 20 },
-    shopItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#34495e', width: '100%', padding: 15, borderRadius: 10, marginVertical: 5, borderWidth: 2, borderColor: '#2980b9' },
+    coinText: { fontSize: 28, fontWeight: 'bold', color: '#ffcc00', textShadowColor: '#000', textShadowOffset: {width:2, height:2}, textShadowRadius: 4 },
+    batMultiplier: { color: '#00f2fe', fontWeight: 'bold', fontSize: 16, textAlign: 'right', textShadowColor: 'black', textShadowRadius: 2 },
+    pauseButton: { position: 'absolute', top: 40, left: 20 },
+    glassBadge: { padding: 10, borderRadius: 15, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+    pauseText: { fontSize: 20 },
+    shieldHUD: { position: 'absolute', top: 100, right: 20 },
+    gravityHUD: { position: 'absolute', top: 160, right: 20 },
+    magnetHUD: { position: 'absolute', top: 220, right: 20 },
+    powerText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+    fullScreen: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
+    gameOverPanel: { padding: 35, borderRadius: 25, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', width: '90%', maxWidth: 400, overflow: 'hidden' },
+    gameOverTitle: { fontSize: 36, fontWeight: '900', color: '#fff', marginBottom: 20, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 4 },
+    scoreBoardGlass: { backgroundColor: 'rgba(255,255,255,0.1)', width: '100%', borderRadius: 15, padding: 20, marginBottom: 25, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+    scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 },
+    scoreLabel: { fontSize: 20, fontWeight: '700', color: '#f1c40f' },
+    scoreValue: { fontSize: 26, fontWeight: '900', color: 'white' },
+    gradientButton: { paddingHorizontal: 30, paddingVertical: 18, borderRadius: 15, alignItems: 'center', justifyContent: 'center', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, width: '100%' },
+    gradientButtonSmall: { paddingHorizontal: 10, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    actionRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 20 },
+    thirdButtonWrapper: { flex: 1, marginHorizontal: 4 },
+    buttonText: { color: 'white', fontSize: 20, fontWeight: '900' },
+    buttonTextMicro: { color: 'white', fontSize: 13, fontWeight: '900' },
+    shopPanel: { padding: 30, borderRadius: 25, alignItems: 'center', width: '90%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', overflow: 'hidden' },
+    shopTitle: { color: '#f6d365', fontSize: 30, fontWeight: '900', marginBottom: 10, textShadowColor: 'black', textShadowRadius: 3 },
+    shopSubtitle: { color: 'rgba(255,255,255,0.8)', fontSize: 18, marginBottom: 25, fontWeight: '600' },
+    shopItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', width: '100%', padding: 15, borderRadius: 15, marginVertical: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
     shopEmoji: { fontSize: 35, marginRight: 15 },
-    shopItemText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-    reelBox: { backgroundColor: 'white', padding: 15, marginHorizontal: 5, borderRadius: 10, borderWidth: 4, borderColor: '#e74c3c', width: 80, height: 80, justifyContent: 'center', alignItems: 'center' },
-    reelText: { fontSize: 45 }
+    shopItemText: { color: 'white', fontSize: 18, fontWeight: '800' },
+    shopItemDesc: { color: '#bdc3c7', fontSize: 12, marginTop: 4 },
+    claimButton: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+    claimText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+    slotContainer: { flexDirection: 'row', justifyContent: 'center', marginVertical: 25 },
+    reelBox: { backgroundColor: 'rgba(255,255,255,0.9)', padding: 15, marginHorizontal: 8, borderRadius: 15, borderWidth: 2, borderColor: '#f1c40f', width: 85, height: 85, justifyContent: 'center', alignItems: 'center', elevation: 5 },
+    reelText: { fontSize: 50 },
+    slotResultBox: { backgroundColor: 'rgba(0,0,0,0.5)', padding: 15, borderRadius: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', marginBottom: 25, width: '100%', alignItems: 'center' },
+    slotResultText: { color: '#f1c40f', fontSize: 22, fontWeight: '900', textAlign: 'center' }
 });
